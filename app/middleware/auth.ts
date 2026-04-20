@@ -2,7 +2,7 @@
 export default defineNuxtRouteMiddleware(async (to) => {
   const authStore = useAuthStore()
 
-  const publicPages = ['/', '/login', '/register', '/forgot-password']
+  const publicPages = ['/', '/login']
   const requiresAuth = !publicPages.includes(to.path)
 
   if (!authStore.isAuthenticated) {
@@ -13,7 +13,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return navigateTo('/login')
   }
 
-  if (authStore.isAuthenticated && (to.path === '/login' || to.path === '/register')) {
+  if (authStore.isAuthenticated && (to.path === '/login')) {
     return navigateTo('/dashboard')
   }
 })
