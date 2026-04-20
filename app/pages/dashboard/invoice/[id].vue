@@ -27,8 +27,13 @@
         </div>
       </div>
       
-      <div class="bg-white rounded-lg shadow p-6">
-        <InvoicePDFPreview v-if="invoice" :invoice-data="invoiceDataForPreview" />
+      <div ref="pdfContentRef" class="bg-white rounded-lg shadow p-6">
+        <component
+          v-if="invoice"
+          :is="currentTemplateComponent"
+          :invoice-data="invoiceDataForPreview"
+          :primary-color="selectedAccentColor"
+        />
         <div v-else class="text-center py-12">
           <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
           <p class="mt-2">Memuat data...</p>
@@ -43,10 +48,34 @@ definePageMeta({
   middleware: 'auth'
 })
 
+import TemplateClassic from '~/components/templates/TemplateClassic.vue'
+import TemplateModern from '~/components/templates/TemplateModern.vue'
+import TemplateMinimal from '~/components/templates/TemplateMinimal.vue'
+import type { TemplateType } from '~/types/template'
+
 const route = useRoute()
 const router = useRouter()
 const invoiceStore = useInvoiceStore()
 const invoice = ref<any>(null)
+const pdfContentRef = ref<HTMLElement | null>(null)
+
+const templateComponents = {
+  classic: TemplateClassic,
+  modern: TemplateModern,
+  minimal: TemplateMinimal
+}
+
+const selectedTemplate = computed<TemplateType>(() => {
+  return (invoice.value?.selected_template || 'classic') as TemplateType
+})
+
+const selectedAccentColor = computed(() => {
+  return invoice.value?.template_accent_color || '#3b82f6'
+})
+
+const currentTemplateComponent = computed(() => {
+  return templateComponents[selectedTemplate.value] || TemplateClassic
+})
 
 const invoiceDataForPreview = computed(() => {
   if (!invoice.value) return null
@@ -66,8 +95,7 @@ const invoiceDataForPreview = computed(() => {
 })
 
 const downloadPDF = async () => {
-  // Implementasi download PDF dari detail
-  const element = document.querySelector('.invoice-pdf') as HTMLElement
+  const element = pdfContentRef.value
   if (element) {
     const html2pdf = (await import('html2pdf.js')).default
     const opt = {

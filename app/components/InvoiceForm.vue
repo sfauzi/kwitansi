@@ -30,6 +30,12 @@
           <input v-model="store.businessInfo.bankAccount" type="text"
                  class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
         </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Atas Nama Rekening</label>
+          <input v-model="store.businessInfo.bankAccountName" type="text"
+                 placeholder="Nama penerima transfer"
+                 class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        </div>
         <div class="md:col-span-2">
           <label class="block text-sm font-medium mb-1">Alamat Bisnis</label>
           <textarea v-model="store.businessInfo.address" rows="2"
@@ -236,7 +242,9 @@ const handleSubmit = async () => {
       taxRate: store.taxRate,
       taxAmount: store.taxAmount,
       total: store.total,
-      notes: store.notes
+      notes: store.notes,
+      selectedTemplate: store.selectedTemplate,
+      templateAccentColor: store.templateAccentColor
     }
 
     emit('saved', result.data)

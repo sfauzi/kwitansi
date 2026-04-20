@@ -32,8 +32,14 @@
     </div>
 
     <ClientOnly>
-      <PDFModal :visible="pdfModalVisible" :invoice-data="currentInvoiceData" @update:visible="pdfModalVisible = $event"
-        @downloaded="handlePDFDownloaded" />
+      <PDFModal
+        :visible="pdfModalVisible"
+        :invoice-data="currentInvoiceData"
+        :template="currentTemplate"
+        :accent-color="currentAccentColor"
+        @update:visible="pdfModalVisible = $event"
+        @downloaded="handlePDFDownloaded"
+      />
     </ClientOnly>
   </div>
 </template>
@@ -53,8 +59,9 @@ const handleSaved = () => {
 }
 
 const handlePDFGenerated = (invoiceData: any) => {
-  console.log('PDF data received:', invoiceData)
   currentInvoiceData.value = invoiceData
+  currentTemplate.value = invoiceStore.selectedTemplate
+  currentAccentColor.value = invoiceStore.templateAccentColor
   pdfModalVisible.value = true
 }
 
@@ -62,6 +69,10 @@ const handlePDFDownloaded = (filename: string) => {
   console.log(`PDF downloaded successfully: ${filename}`)
   // Optional: Tampilkan notifikasi sukses download
 }
+
+const invoiceStore = useInvoiceStore()
+const currentTemplate = ref<'classic' | 'modern' | 'minimal'>('classic')
+const currentAccentColor = ref('#3b82f6')
 
 // const authStore = useAuthStore()
 

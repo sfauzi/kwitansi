@@ -5,6 +5,7 @@ export interface BusinessInfo {
   whatsapp: string;
   bankName: string;
   bankAccount: string;
+  bankAccountName: string; // <-- baru
   address: string;
 }
 
@@ -40,6 +41,8 @@ export interface Invoice {
   discount_amount: number
   tax_amount: number
   total: number
+  selected_template?: 'classic' | 'modern' | 'minimal'
+  template_accent_color?: string
   created_at: string
   updated_at: string
 }
