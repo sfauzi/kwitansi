@@ -1,21 +1,19 @@
 <!-- components/InvoicePreview.vue -->
 <template>
   <div class="invoice-preview-container">
-    <!-- Template Selector -->
-    <div class="mb-4 p-4 bg-white rounded-lg shadow">
-      <TemplateSelector 
+    <!-- Template Selector Card -->
+    <div class="selector-card">
+      <TemplateSelector
         v-model="store.selectedTemplate"
+        :accent-color="store.templateAccentColor"
         @update:accentColor="store.setTemplateAccentColor"
       />
     </div>
-    
+
     <!-- Dynamic Template Renderer -->
-    <div class="bg-white rounded-lg shadow overflow-hidden">
-      <component 
-        :is="currentTemplateComponent" 
-        :invoice-data="invoiceDataForTemplate"
-        :primary-color="store.templateAccentColor"
-      />
+    <div class="preview-canvas">
+      <component :is="currentTemplateComponent" :invoice-data="invoiceDataForTemplate"
+        :primary-color="store.templateAccentColor" />
     </div>
   </div>
 </template>
@@ -61,3 +59,26 @@ const invoiceDataForTemplate = computed(() => ({
   notes: store.notes
 }))
 </script>
+
+<style scoped>
+.invoice-preview-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.selector-card {
+  background: #fff;
+  border: 1px solid #E5EDFF;
+  border-radius: 14px;
+  padding: 1.25rem;
+}
+
+.preview-canvas {
+  background: #fff;
+  border: 1px solid #E5EDFF;
+  border-radius: 14px;
+  overflow: hidden;
+  min-height: 400px;
+}
+</style>

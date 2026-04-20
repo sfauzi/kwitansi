@@ -7,6 +7,7 @@ export default defineNuxtConfig({
     // preset: "static"
     preset: 'node-server'
   },
+  css: ['~/assets/css/kwitansi.css'],
   runtimeConfig: {
     public: {
       supabaseUrl: process.env.SUPABASE_URL,
@@ -25,4 +26,9 @@ export default defineNuxtConfig({
     '@nuxtjs/tailwindcss',
     '@pinia/nuxt'
   ],
+  googleFonts: {
+    families: {
+      Mansalva: true,
+    },
+  },
 })
