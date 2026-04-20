@@ -27,18 +27,19 @@ export interface InvoiceItem {
 }
 
 export interface Invoice {
-  id?: string;
-  businessInfo: BusinessInfo;
-  clientInfo: ClientInfo;
-  items: InvoiceItem[];
-  discountType: 'percentage' | 'amount';
-  discountValue: number;
-  taxRate: number;
-  notes: string;
-  subtotal: number;
-  discountAmount: number;
-  taxAmount: number;
-  total: number;
-  createdAt?: string;
-  updatedAt?: string;
+  id: string
+  user_id: string
+  business_info: BusinessInfo
+  client_info: ClientInfo
+  items: InvoiceItem[]
+  discount_type: 'percentage' | 'amount'
+  discount_value: number
+  tax_rate: number
+  notes: string
+  subtotal: number
+  discount_amount: number
+  tax_amount: number
+  total: number
+  created_at: string
+  updated_at: string
 }

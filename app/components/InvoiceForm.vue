@@ -175,6 +175,14 @@
 <script setup lang="ts">
 import { useInvoiceStore } from '~/stores/invoiceStore'
 
+const props = withDefaults(defineProps<{
+  mode?: 'create' | 'edit'
+  invoiceId?: string
+}>(), {
+  mode: 'create',
+  invoiceId: ''
+})
+
 const store = useInvoiceStore()
 const emit = defineEmits(['saved', 'pdf-generated'])
 
@@ -206,10 +214,17 @@ const handleSubmit = async () => {
     alert('Mohon lengkapi semua field yang wajib diisi!')
     return
   }
-  
-  const result = await store.saveInvoice()
+
+  let result: any
+  const payload = store.formattedForDatabase
+
+  if (props.mode === 'edit' && props.invoiceId) {
+    result = await store.updateInvoice(props.invoiceId, payload)
+  } else {
+    result = await store.saveInvoice()
+  }
+
   if (result.success) {
-    // Siapkan data untuk PDF
     const pdfData = {
       businessInfo: store.businessInfo,
       clientInfo: store.clientInfo,
@@ -223,12 +238,19 @@ const handleSubmit = async () => {
       total: store.total,
       notes: store.notes
     }
-    
+
     emit('saved', result.data)
-    emit('pdf-generated', pdfData) // 🔥 Trigger untuk buka modal PDF
-    store.resetForm()
+    emit('pdf-generated', pdfData)
+
+    if (props.mode === 'create') {
+      store.resetForm()
+    }
   } else {
-    alert('Gagal menyimpan invoice: ' + (result.error as any)?.message || 'Unknown error')
+    const errorMessage =
+      typeof result.error === 'string'
+        ? result.error
+        : result.error?.message || 'Unknown error'
+    alert(`Gagal menyimpan invoice: ${errorMessage}`)
   }
 }
 </script>

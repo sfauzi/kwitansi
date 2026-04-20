@@ -4,6 +4,10 @@ import type { Invoice, InvoiceItem, BusinessInfo, ClientInfo } from '~/types/inv
 
 export const useInvoiceStore = defineStore('invoice', {
   state: () => ({
+    invoices: [] as Invoice[],
+    currentInvoice: null as Invoice | null,
+    loading: false,
+    error: null as string | null,
     businessInfo: {
       name: '',
       email: '',
@@ -36,31 +40,31 @@ export const useInvoiceStore = defineStore('invoice', {
     notes: '',
     saving: false
   }),
-  
+
   getters: {
     subtotal: (state) => {
       return state.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
     },
-    
+
     discountAmount: (state) => {
       if (state.discountType === 'percentage') {
         return (state.subtotal * state.discountValue) / 100
       }
       return state.discountValue
     },
-    
+
     taxableAmount: (state) => {
       return state.subtotal - state.discountAmount
     },
-    
+
     taxAmount: (state) => {
       return (state.taxableAmount * state.taxRate) / 100
     },
-    
+
     total: (state) => {
       return state.taxableAmount + state.taxAmount
     },
-    
+
     // 🔥 Perbaikan: Format data untuk dikirim ke Supabase (snake_case)
     formattedForDatabase: (state) => {
       return {
@@ -76,9 +80,13 @@ export const useInvoiceStore = defineStore('invoice', {
         tax_amount: state.taxAmount,        // snake_case
         total: state.total
       }
+    },
+
+    getInvoiceById: (state) => (id: string) => {
+      return state.invoices.find(invoice => invoice.id === id)
     }
   },
-  
+
   actions: {
     addItem() {
       this.items.push({
@@ -89,13 +97,13 @@ export const useInvoiceStore = defineStore('invoice', {
         total: 0
       })
     },
-    
+
     removeItem(id: string) {
       if (this.items.length > 1) {
         this.items = this.items.filter(item => item.id !== id)
       }
     },
-    
+
     updateItem(id: string, field: keyof InvoiceItem, value: any) {
       const item = this.items.find(i => i.id === id)
       if (item) {
@@ -105,26 +113,26 @@ export const useInvoiceStore = defineStore('invoice', {
         }
       }
     },
-    
+
     async saveInvoice() {
       this.saving = true
       const { supabase } = useSupabase()
-      
+
       try {
         const dataToSave = this.formattedForDatabase
-        
+
         console.log('Data yang akan disimpan:', dataToSave) // Debugging
-        
+
         const { data, error } = await supabase
           .from('invoices')
           .insert([dataToSave])
           .select()
-        
+
         if (error) {
           console.error('Supabase error detail:', error)
           throw error
         }
-        
+
         console.log('Invoice berhasil disimpan:', data)
         return { success: true, data }
       } catch (error) {
@@ -134,7 +142,7 @@ export const useInvoiceStore = defineStore('invoice', {
         this.saving = false
       }
     },
-    
+
     resetForm() {
       this.businessInfo = {
         name: '',
@@ -164,6 +172,133 @@ export const useInvoiceStore = defineStore('invoice', {
       this.discountValue = 0
       this.taxRate = 0
       this.notes = ''
-    }
+    },
+
+    async fetchInvoices() {
+      this.loading = true
+      const { supabase } = useSupabase()
+      const authStore = useAuthStore()
+
+      try {
+        const { data, error } = await supabase
+          .from('invoices')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+
+        this.invoices = data
+        return { success: true, data }
+      } catch (error: any) {
+        this.error = error.message
+        return { success: false, error: error.message }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async fetchInvoiceById(id: string) {
+      this.loading = true
+      const { supabase } = useSupabase()
+
+      try {
+        const { data, error } = await supabase
+          .from('invoices')
+          .select('*')
+          .eq('id', id)
+          .single()
+
+        if (error) throw error
+
+        this.currentInvoice = data
+        return { success: true, data }
+      } catch (error: any) {
+        this.error = error.message
+        return { success: false, error: error.message }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async saveInvoice() {
+      this.saving = true
+      const { supabase } = useSupabase()
+
+      try {
+        const dataToSave = this.formattedForDatabase
+
+        const { data, error } = await supabase
+          .from('invoices')
+          .insert([dataToSave])
+          .select()
+
+        if (error) throw error
+
+        await this.fetchInvoices()
+        return { success: true, data }
+      } catch (error: any) {
+        console.error('Error saving invoice:', error)
+        return { success: false, error: error.message }
+      } finally {
+        this.saving = false
+      }
+    },
+
+    async updateInvoice(id: string, invoiceData: any) {
+      this.loading = true
+      const { supabase } = useSupabase()
+
+      try {
+        const { data, error } = await supabase
+          .from('invoices')
+          .update(invoiceData)
+          .eq('id', id)
+          .select()
+
+        if (error) throw error
+
+        await this.fetchInvoices() // Refresh list
+        return { success: true, data }
+      } catch (error: any) {
+        this.error = error.message
+        return { success: false, error: error.message }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async deleteInvoice(id: string) {
+      this.loading = true
+      const { supabase } = useSupabase()
+
+      try {
+        const { error } = await supabase
+          .from('invoices')
+          .delete()
+          .eq('id', id)
+
+        if (error) throw error
+
+        await this.fetchInvoices() // Refresh list
+        return { success: true }
+      } catch (error: any) {
+        this.error = error.message
+        return { success: false, error: error.message }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    loadInvoiceToForm(invoice: Invoice) {
+      // Load data invoice ke form untuk edit
+      this.businessInfo = invoice.business_info
+      this.clientInfo = invoice.client_info
+      this.items = invoice.items
+      this.discountType = invoice.discount_type
+      this.discountValue = invoice.discount_value
+      this.taxRate = invoice.tax_rate
+      this.notes = invoice.notes
+    },
+    
   }
 })
