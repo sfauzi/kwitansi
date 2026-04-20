@@ -176,7 +176,7 @@
 import { useInvoiceStore } from '~/stores/invoiceStore'
 
 const store = useInvoiceStore()
-const emit = defineEmits(['saved'])
+const emit = defineEmits(['saved', 'pdf-generated'])
 
 // Test koneksi saat komponen dimuat
 onMounted(async () => {
@@ -209,9 +209,24 @@ const handleSubmit = async () => {
   
   const result = await store.saveInvoice()
   if (result.success) {
+    // Siapkan data untuk PDF
+    const pdfData = {
+      businessInfo: store.businessInfo,
+      clientInfo: store.clientInfo,
+      items: store.items,
+      subtotal: store.subtotal,
+      discountAmount: store.discountAmount,
+      discountValue: store.discountValue,
+      discountType: store.discountType,
+      taxRate: store.taxRate,
+      taxAmount: store.taxAmount,
+      total: store.total,
+      notes: store.notes
+    }
+    
     emit('saved', result.data)
+    emit('pdf-generated', pdfData) // 🔥 Trigger untuk buka modal PDF
     store.resetForm()
-    alert('Invoice berhasil disimpan!')
   } else {
     alert('Gagal menyimpan invoice: ' + (result.error as any)?.message || 'Unknown error')
   }
