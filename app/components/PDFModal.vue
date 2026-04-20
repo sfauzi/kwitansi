@@ -1,4 +1,4 @@
-<!-- components/PDFModal.vue -->
+<!-- components/PDFModal.vue (update) -->
 <template>
   <div v-if="visible" class="fixed inset-0 z-50 overflow-y-auto">
     <!-- Overlay -->
@@ -9,7 +9,7 @@
       <div class="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
         <!-- Header -->
         <div class="flex justify-between items-center p-4 border-b">
-          <h3 class="text-lg font-semibold">Preview Invoice</h3>
+          <h3 class="text-lg font-semibold">Preview Invoice - {{ templateName }}</h3>
           <button @click="close" class="text-gray-400 hover:text-gray-600">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -20,7 +20,11 @@
         <!-- Content - PDF Preview Area -->
         <div class="p-4 overflow-y-auto max-h-[calc(90vh-120px)] bg-gray-50">
           <div ref="pdfContentRef" class="bg-white shadow-lg">
-            <InvoicePDFPreview :invoice-data="invoiceData" />
+            <component 
+              :is="currentTemplateComponent" 
+              :invoice-data="invoiceData"
+              :primary-color="resolvedAccentColor"
+            />
           </div>
         </div>
         
@@ -50,11 +54,16 @@
 
 <script setup lang="ts">
 import html2pdf from 'html2pdf.js'
-import InvoicePDFPreview from './InvoicePDFPreview.vue'
+import TemplateClassic from './templates/TemplateClassic.vue'
+import TemplateModern from './templates/TemplateModern.vue'
+import TemplateMinimal from './templates/TemplateMinimal.vue'
+import type { TemplateType } from '~/types/template'
 
 const props = defineProps<{
   visible: boolean
   invoiceData: any
+  template?: TemplateType
+  accentColor?: string
 }>()
 
 const emit = defineEmits(['update:visible', 'downloaded'])
@@ -62,9 +71,42 @@ const emit = defineEmits(['update:visible', 'downloaded'])
 const pdfContentRef = ref<HTMLElement | null>(null)
 const isGenerating = ref(false)
 
+const templateComponents = {
+  classic: TemplateClassic,
+  modern: TemplateModern,
+  minimal: TemplateMinimal
+}
+
+const resolvedTemplate = computed(() => {
+  return (
+    props.template ||
+    props.invoiceData?.selectedTemplate ||
+    props.invoiceData?.selected_template ||
+    'classic'
+  ) as TemplateType
+})
+
+const currentTemplateComponent = computed(() => {
+  return templateComponents[resolvedTemplate.value] || TemplateClassic
+})
+
+const templateName = computed(() => {
+  const names = { classic: 'Classic', modern: 'Modern', minimal: 'Minimal' }
+  return names[resolvedTemplate.value]
+})
+
+const resolvedAccentColor = computed(() => {
+  return (
+    props.accentColor ||
+    props.invoiceData?.templateAccentColor ||
+    props.invoiceData?.template_accent_color ||
+    '#3b82f6'
+  )
+})
+
 const filename = computed(() => {
   const invoiceNumber = props.invoiceData?.clientInfo?.invoiceNumber || 'invoice'
-  return `${invoiceNumber}.pdf`
+  return `${invoiceNumber}_${templateName.value}.pdf`
 })
 
 const close = () => {
@@ -81,14 +123,13 @@ const downloadPDF = async () => {
   isGenerating.value = true
 
   try {
-    // Konfigurasi html2pdf
     const element = pdfContentRef.value
     const opt = {
-      margin: [0.5, 0.5, 0.5, 0.5], // margin in inches
+      margin: [0.5, 0.5, 0.5, 0.5],
       filename: filename.value,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
-        scale: 2, // Higher scale for better quality
+        scale: 2,
         useCORS: true,
         logging: false,
         letterRendering: true
@@ -100,36 +141,18 @@ const downloadPDF = async () => {
       }
     }
 
-    // Generate dan download PDF
     await html2pdf().set(opt).from(element).save()
-    
     emit('downloaded', filename.value)
     
-    // Tutup modal setelah download sukses (opsional)
     setTimeout(() => {
       close()
     }, 1500)
     
   } catch (error) {
     console.error('Error generating PDF:', error)
-    alert('Gagal menghasilkan PDF. Silakan coba lagi. Error: ' + (error as Error).message)
+    alert('Gagal menghasilkan PDF. Silakan coba lagi.')
   } finally {
     isGenerating.value = false
   }
 }
-
-// Watch untuk debug
-watch(() => props.visible, (newVal) => {
-  if (newVal) {
-    console.log('Modal opened with data:', props.invoiceData)
-    // Pastikan konten sudah ready
-    nextTick(() => {
-      if (pdfContentRef.value) {
-        console.log('PDF content element ready')
-      } else {
-        console.warn('PDF content element not found after modal open')
-      }
-    })
-  }
-})
 </script>

@@ -90,7 +90,7 @@
       <h3 style="font-weight: 600; margin-bottom: 8px;">Informasi Pembayaran:</h3>
       <p>Bank: {{ invoiceData.businessInfo.bankName }}</p>
       <p>No. Rekening: {{ invoiceData.businessInfo.bankAccount }}</p>
-      <p>Atas Nama: {{ invoiceData.businessInfo.name }}</p>
+      <p>Atas Nama: {{ invoiceData.businessInfo.bankAccountName || invoiceData.businessInfo.name }}</p>
     </div>
 
     <!-- Notes -->

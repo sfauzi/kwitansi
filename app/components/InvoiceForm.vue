@@ -30,6 +30,12 @@
           <input v-model="store.businessInfo.bankAccount" type="text"
                  class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
         </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Atas Nama Rekening</label>
+          <input v-model="store.businessInfo.bankAccountName" type="text"
+                 placeholder="Nama penerima transfer"
+                 class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        </div>
         <div class="md:col-span-2">
           <label class="block text-sm font-medium mb-1">Alamat Bisnis</label>
           <textarea v-model="store.businessInfo.address" rows="2"
@@ -175,6 +181,14 @@
 <script setup lang="ts">
 import { useInvoiceStore } from '~/stores/invoiceStore'
 
+const props = withDefaults(defineProps<{
+  mode?: 'create' | 'edit'
+  invoiceId?: string
+}>(), {
+  mode: 'create',
+  invoiceId: ''
+})
+
 const store = useInvoiceStore()
 const emit = defineEmits(['saved', 'pdf-generated'])
 
@@ -206,10 +220,17 @@ const handleSubmit = async () => {
     alert('Mohon lengkapi semua field yang wajib diisi!')
     return
   }
-  
-  const result = await store.saveInvoice()
+
+  let result: any
+  const payload = store.formattedForDatabase
+
+  if (props.mode === 'edit' && props.invoiceId) {
+    result = await store.updateInvoice(props.invoiceId, payload)
+  } else {
+    result = await store.saveInvoice()
+  }
+
   if (result.success) {
-    // Siapkan data untuk PDF
     const pdfData = {
       businessInfo: store.businessInfo,
       clientInfo: store.clientInfo,
@@ -221,14 +242,23 @@ const handleSubmit = async () => {
       taxRate: store.taxRate,
       taxAmount: store.taxAmount,
       total: store.total,
-      notes: store.notes
+      notes: store.notes,
+      selectedTemplate: store.selectedTemplate,
+      templateAccentColor: store.templateAccentColor
     }
-    
+
     emit('saved', result.data)
-    emit('pdf-generated', pdfData) // 🔥 Trigger untuk buka modal PDF
-    store.resetForm()
+    emit('pdf-generated', pdfData)
+
+    if (props.mode === 'create') {
+      store.resetForm()
+    }
   } else {
-    alert('Gagal menyimpan invoice: ' + (result.error as any)?.message || 'Unknown error')
+    const errorMessage =
+      typeof result.error === 'string'
+        ? result.error
+        : result.error?.message || 'Unknown error'
+    alert(`Gagal menyimpan invoice: ${errorMessage}`)
   }
 }
 </script>

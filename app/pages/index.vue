@@ -4,6 +4,15 @@
     <div class="container mx-auto px-4 py-8">
       <h1 class="text-3xl font-bold text-center mb-8">Invoice Generator</h1>
 
+      <!-- <div class="space-x-4">
+        <NuxtLink to="/login" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600">
+          Login
+        </NuxtLink>
+        <NuxtLink to="/register" class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600">
+          Daftar
+        </NuxtLink>
+      </div> -->
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <!-- Form Section -->
         <div class="overflow-y-auto max-h-screen pb-8">
@@ -26,6 +35,8 @@
       <PDFModal
         :visible="pdfModalVisible"
         :invoice-data="currentInvoiceData"
+        :template="currentTemplate"
+        :accent-color="currentAccentColor"
         @update:visible="pdfModalVisible = $event"
         @downloaded="handlePDFDownloaded"
       />
@@ -48,8 +59,9 @@ const handleSaved = () => {
 }
 
 const handlePDFGenerated = (invoiceData: any) => {
-  console.log('PDF data received:', invoiceData)
   currentInvoiceData.value = invoiceData
+  currentTemplate.value = invoiceStore.selectedTemplate
+  currentAccentColor.value = invoiceStore.templateAccentColor
   pdfModalVisible.value = true
 }
 
@@ -57,4 +69,18 @@ const handlePDFDownloaded = (filename: string) => {
   console.log(`PDF downloaded successfully: ${filename}`)
   // Optional: Tampilkan notifikasi sukses download
 }
+
+const invoiceStore = useInvoiceStore()
+const currentTemplate = ref<'classic' | 'modern' | 'minimal'>('classic')
+const currentAccentColor = ref('#3b82f6')
+
+// const authStore = useAuthStore()
+
+// // Redirect ke dashboard jika sudah login
+// onMounted(async () => {
+//   await authStore.getCurrentUser()
+//   if (authStore.isAuthenticated) {
+//     navigateTo('/dashboard')
+//   }
+// })
 </script>

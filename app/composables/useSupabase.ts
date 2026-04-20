@@ -10,8 +10,9 @@ export const useSupabase = () => {
     config.public.supabaseKey,
     {
       auth: {
-        persistSession: false, // Nonaktifkan session persistence jika tidak perlu login
-        autoRefreshToken: false
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
       },
       db: {
         schema: 'public'
