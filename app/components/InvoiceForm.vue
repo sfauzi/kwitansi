@@ -215,6 +215,8 @@
       </div>
     </div>
 
+    <PaymentSection @payment-updated="handlePaymentUpdated" />
+
     <!-- Actions -->
     <div class="form-actions">
       <button type="button" @click="store.resetForm()" class="btn-secondary">
@@ -238,6 +240,7 @@
 
 <script setup lang="ts">
 import { useInvoiceStore } from '~/stores/invoiceStore'
+import PaymentSection from './PaymentSection.vue';
 
 const props = withDefaults(defineProps<{
   mode?: 'create' | 'edit'
@@ -246,6 +249,11 @@ const props = withDefaults(defineProps<{
   mode: 'create',
   invoiceId: ''
 })
+
+const handlePaymentUpdated = () => {
+  // Optional: Trigger re-render atau validasi tambahan
+  console.log('Payment updated')
+}
 
 const store = useInvoiceStore()
 const emit = defineEmits(['saved', 'pdf-generated'])
@@ -302,7 +310,12 @@ const handleSubmit = async () => {
       total: store.total,
       notes: store.notes,
       selectedTemplate: store.selectedTemplate,
-      templateAccentColor: store.templateAccentColor
+      templateAccentColor: store.templateAccentColor,
+      // payment data
+      payments: store.payments,
+      totalPaid: store.totalPaid,
+      remainingBalance: store.remainingBalance,
+      paymentStatus: store.paymentStatus
     }
 
     emit('saved', result.data)

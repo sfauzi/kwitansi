@@ -1,6 +1,7 @@
 <!-- components/templates/TemplateMinimal.vue -->
 <template>
   <div class="template-minimal" :style="styleVariables">
+
     <!-- Header minimal -->
     <div class="border-b border-gray-200 pb-6 mb-6">
       <div class="flex justify-between items-start">
@@ -24,9 +25,7 @@
         <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Kepada</div>
         <div class="font-medium">{{ invoiceData.clientInfo.name }}</div>
         <div class="text-sm text-gray-600">{{ invoiceData.clientInfo.email }}</div>
-        <div v-if="invoiceData.clientInfo.whatsapp" class="text-sm text-gray-600">
-          {{ invoiceData.clientInfo.whatsapp }}
-        </div>
+        <div v-if="invoiceData.clientInfo.whatsapp" class="text-sm text-gray-600">{{ invoiceData.clientInfo.whatsapp }}</div>
         <div class="text-sm text-gray-600">{{ invoiceData.clientInfo.address }}</div>
       </div>
       <div>
@@ -86,8 +85,58 @@
       </div>
     </div>
 
+    <!-- ── Payment Status ── -->
+    <div v-if="invoiceData.payments && invoiceData.payments.length > 0"
+         class="border-t border-gray-200 pt-5 mb-6">
+      <div class="text-xs text-gray-500 uppercase tracking-wider mb-3">Data Pembayaran</div>
+
+      <!-- Tabel riwayat -->
+      <table class="w-full mb-4">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="py-2 text-left text-sm font-semibold text-gray-700 w-8">No</th>
+            <th class="py-2 text-left text-sm font-semibold text-gray-700">Tanggal</th>
+            <th class="py-2 text-left text-sm font-semibold text-gray-700">Keterangan</th>
+            <th class="py-2 text-right text-sm font-semibold text-gray-700">Jumlah</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(payment, index) in invoiceData.payments" :key="payment.id"
+              class="border-b border-gray-100">
+            <td class="py-2 text-sm text-gray-600">{{ Number(index) + 1 }}</td>
+            <td class="py-2 text-sm text-gray-600">{{ formatDateTime(payment.paymentDate) }}</td>
+            <td class="py-2 text-sm text-gray-600">
+              {{ payment.type === 'dp' ? 'Down Payment' : 'Pelunasan' }}
+              <span v-if="payment.notes" class="text-gray-400"> · {{ payment.notes }}</span>
+            </td>
+            <td class="py-2 text-sm text-right text-gray-800">{{ formatRupiah(payment.amount) }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Summary kanan bawah -->
+      <div class="flex justify-end">
+        <div class="w-72">
+          <div class="flex justify-between text-sm py-1 border-b border-gray-100">
+            <span class="text-gray-500">Jumlah Bayar</span>
+            <span class="font-semibold text-gray-800">{{ formatRupiah(getTotalPaid()) }}</span>
+          </div>
+          <div class="flex justify-between text-sm py-1 border-b border-gray-100">
+            <span class="text-gray-500">Discount</span>
+            <span class="font-semibold text-gray-800">{{ formatRupiah(invoiceData.discountAmount || 0) }}</span>
+          </div>
+          <div class="flex justify-between text-sm py-2">
+            <span class="text-gray-500">Kurang</span>
+            <span class="font-bold" :class="getRemainingBalance() > 0 ? 'text-red-600' : 'text-green-600'">
+              {{ getRemainingBalance() > 0 ? formatRupiah(getRemainingBalance()) : formatRupiah(0) }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Bank Info minimal -->
-    <div v-if="invoiceData.businessInfo.bankName && invoiceData.businessInfo.bankAccount" 
+    <div v-if="invoiceData.businessInfo.bankName && invoiceData.businessInfo.bankAccount"
          class="text-sm border-t border-gray-200 pt-4 mb-4">
       <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Informasi Pembayaran</div>
       <div class="grid grid-cols-2 gap-1">
@@ -139,12 +188,42 @@ const formatDate = (dateString: string) => {
   })
 }
 
+const formatDateTime = (dateString: string) => {
+  if (!dateString) return '-'
+  return new Date(dateString).toLocaleString('id-ID', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 const discountDisplay = computed(() => {
   if (props.invoiceData.discountType === 'percentage') {
     return `${props.invoiceData.discountValue}%`
   }
   return formatRupiah(props.invoiceData.discountValue)
 })
+
+const getTotalPaid = () => {
+  if (typeof props.invoiceData?.totalPaid === 'number') {
+    return props.invoiceData.totalPaid
+  }
+
+  return (props.invoiceData?.payments || []).reduce(
+    (sum: number, payment: any) => sum + (Number(payment.amount) || 0),
+    0
+  )
+}
+
+const getRemainingBalance = () => {
+  if (typeof props.invoiceData?.remainingBalance === 'number') {
+    return Math.max(0, props.invoiceData.remainingBalance)
+  }
+
+  return Math.max(0, (Number(props.invoiceData?.total) || 0) - getTotalPaid())
+}
 </script>
 
 <style scoped>

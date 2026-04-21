@@ -181,8 +181,24 @@ const showDeleteModal = ref(false)
 const invoiceToDelete = ref<any>(null)
 
 // Computed
+const getTotalPaidFromInvoice = (invoice: any) => {
+  if (Array.isArray(invoice.payments)) {
+    return invoice.payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+  }
+  if (typeof invoice.remaining_balance === 'number') {
+    return Math.max(0, (invoice.total || 0) - invoice.remaining_balance)
+  }
+  return 0
+}
+
+const getRemainingFromInvoice = (invoice: any) => {
+  if (typeof invoice.remaining_balance === 'number') return Math.max(0, invoice.remaining_balance)
+  return Math.max(0, (invoice.total || 0) - getTotalPaidFromInvoice(invoice))
+}
+
 const totalRevenue = computed(() => {
-  return invoiceStore.invoices.reduce((sum, inv) => sum + inv.total, 0)
+  // Pendapatan aktual = total pembayaran masuk
+  return invoiceStore.invoices.reduce((sum, inv) => sum + getTotalPaidFromInvoice(inv), 0)
 })
 
 const thisMonthInvoices = computed(() => {
@@ -244,19 +260,29 @@ const formatDate = (dateString: string) => {
 }
 
 const getStatus = (invoice: any) => {
+  const remaining = getRemainingFromInvoice(invoice)
+  const totalPaid = getTotalPaidFromInvoice(invoice)
+
+  if (remaining <= 0) return 'Lunas'
+  if (invoice.payment_status === 'dp_paid') return 'DP Dibayar'
+  if (totalPaid > 0) return 'Sebagian Dibayar'
+
   const dueDate = new Date(invoice.client_info.dueDate)
   const today = new Date()
-  
+
   if (dueDate < today) return 'Jatuh Tempo'
   if (dueDate.toDateString() === today.toDateString()) return 'Hari Ini'
-  return 'Belum Jatuh Tempo'
+  return 'Belum Dibayar'
 }
 
 const getStatusClass = (invoice: any) => {
   const status = getStatus(invoice)
+  if (status === 'Lunas') return 'px-2 py-1 text-xs rounded-full bg-green-100 text-green-800'
+  if (status === 'DP Dibayar') return 'px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800'
+  if (status === 'Sebagian Dibayar') return 'px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800'
   if (status === 'Jatuh Tempo') return 'px-2 py-1 text-xs rounded-full bg-red-100 text-red-800'
-  if (status === 'Hari Ini') return 'px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800'
-  return 'px-2 py-1 text-xs rounded-full bg-green-100 text-green-800'
+  if (status === 'Hari Ini') return 'px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-800'
+  return 'px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700'
 }
 
 const refreshData = async () => {

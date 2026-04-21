@@ -1,7 +1,8 @@
 <!-- components/templates/TemplateModern.vue -->
 <template>
   <div class="template-modern" :style="styleVariables">
-    <!-- Header dengan gradient -->
+
+    <!-- Header gradient -->
     <div class="header-gradient text-white p-6 -mx-6 -mt-6 mb-6 rounded-b-lg">
       <div class="flex justify-between items-start">
         <div>
@@ -18,7 +19,7 @@
       </div>
     </div>
 
-    <!-- Client Info dengan card style -->
+    <!-- Client Info card -->
     <div class="grid grid-cols-2 gap-6 mb-8">
       <div class="bg-gray-50 p-4 rounded-lg">
         <h3 class="font-bold text-primary mb-3 uppercase text-sm tracking-wide">Bill To:</h3>
@@ -39,7 +40,7 @@
       </div>
     </div>
 
-    <!-- Items Table dengan style modern -->
+    <!-- Items Table modern -->
     <div class="mb-8 overflow-x-auto">
       <table class="w-full">
         <thead>
@@ -51,8 +52,8 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(item, index) in invoiceData.items" :key="item.id" 
-              :class="['border-b border-gray-200', index % 2 === 0 ? 'bg-white' : 'bg-gray-50']">
+          <tr v-for="(item, index) in invoiceData.items" :key="item.id"
+            :class="['border-b border-gray-200', Number(index) % 2 === 0 ? 'bg-white' : 'bg-gray-50']">
             <td class="p-3">{{ item.description }}</td>
             <td class="p-3 text-right">{{ item.quantity }}</td>
             <td class="p-3 text-right">{{ formatRupiah(item.unitPrice) }}</td>
@@ -62,7 +63,7 @@
       </table>
     </div>
 
-    <!-- Summary dengan card -->
+    <!-- Summary card -->
     <div class="flex justify-end mb-8">
       <div class="w-80 bg-gray-50 rounded-lg p-4">
         <div class="flex justify-between py-2">
@@ -84,10 +85,63 @@
       </div>
     </div>
 
-    <!-- Bank Info dengan card -->
-    <div v-if="invoiceData.businessInfo.bankName && invoiceData.businessInfo.bankAccount" 
-         class="bg-blue-50 border-l-4 border-primary p-4 mb-4 rounded">
-      <h3 class="font-bold text-primary mb-2">💳 Informasi Pembayaran</h3>
+    <!-- ── Payment Status ── -->
+    <div v-if="invoiceData.payments && invoiceData.payments.length > 0" class="mb-6">
+      <!-- Label header strip -->
+      <div class="flex items-center gap-2 mb-3">
+        <div class="h-px flex-1 bg-gray-200"></div>
+        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2">Data Pembayaran</span>
+        <div class="h-px flex-1 bg-gray-200"></div>
+      </div>
+
+      <!-- Tabel riwayat -->
+      <table class="w-full mb-4">
+        <thead>
+          <tr class="border-b-2 border-gray-200">
+            <th class="py-2 pb-3 text-left text-sm font-semibold text-gray-600 w-10">No</th>
+            <th class="py-2 pb-3 text-left text-sm font-semibold text-gray-600">Tanggal</th>
+            <th class="py-2 pb-3 text-left text-sm font-semibold text-gray-600">Keterangan</th>
+            <th class="py-2 pb-3 text-right text-sm font-semibold text-gray-600">Jumlah</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(payment, index) in invoiceData.payments" :key="payment.id" class="border-b border-gray-100">
+            <td class="py-2 text-sm text-gray-500">{{ Number(index) + 1 }}</td>
+            <td class="py-2 text-sm text-gray-600">{{ formatDateTime(payment.paymentDate) }}</td>
+            <td class="py-2 text-sm text-gray-600">
+              {{ payment.type === 'dp' ? 'Down Payment' : 'Pelunasan' }}
+              <span v-if="payment.notes" class="text-gray-400"> · {{ payment.notes }}</span>
+            </td>
+            <td class="py-2 text-sm text-right font-medium text-gray-800">{{ formatRupiah(payment.amount) }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Summary kanan bawah -->
+      <div class="flex justify-end">
+        <div class="w-80 bg-gray-50 rounded-lg overflow-hidden">
+          <div class="flex justify-between px-4 py-2 border-b border-gray-200">
+            <span class="text-sm text-gray-500">Jumlah Bayar</span>
+            <span class="text-sm font-bold text-gray-800">{{ formatRupiah(getTotalPaid()) }}</span>
+          </div>
+          <div class="flex justify-between px-4 py-2 border-b border-gray-200">
+            <span class="text-sm text-gray-500">Discount</span>
+            <span class="text-sm font-bold text-gray-800">{{ formatRupiah(invoiceData.discountAmount || 0) }}</span>
+          </div>
+          <div class="flex justify-between px-4 py-3">
+            <span class="text-sm text-gray-500">Kurang</span>
+            <span class="text-sm font-bold" :class="getRemainingBalance() > 0 ? 'text-red-600' : 'text-green-600'">
+              {{ getRemainingBalance() > 0 ? formatRupiah(getRemainingBalance()) : formatRupiah(0) }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bank Info -->
+    <div v-if="invoiceData.businessInfo.bankName && invoiceData.businessInfo.bankAccount"
+      class="bg-blue-50 border-l-4 border-primary p-4 mb-4 rounded">
+      <h3 class="font-bold text-primary mb-2">Informasi Pembayaran</h3>
       <div class="grid grid-cols-2 gap-2 text-sm">
         <div>Bank:</div>
         <div class="font-semibold">{{ invoiceData.businessInfo.bankName }}</div>
@@ -100,7 +154,7 @@
 
     <!-- Notes -->
     <div v-if="invoiceData.notes" class="bg-yellow-50 p-4 rounded-lg mb-4">
-      <h3 class="font-bold text-yellow-800 mb-2">📝 Catatan:</h3>
+      <h3 class="font-bold text-yellow-800 mb-2">Catatan</h3>
       <p class="text-sm text-yellow-700">{{ invoiceData.notes }}</p>
     </div>
 
@@ -142,12 +196,31 @@ const formatDate = (dateString: string) => {
   })
 }
 
+const formatDateTime = (dateString: string) => {
+  if (!dateString) return '-'
+  return new Date(dateString).toLocaleString('id-ID', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 const discountDisplay = computed(() => {
   if (props.invoiceData.discountType === 'percentage') {
     return `${props.invoiceData.discountValue}%`
   }
   return formatRupiah(props.invoiceData.discountValue)
 })
+
+const getTotalPaid = () => {
+  return (props.invoiceData?.payments || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+}
+
+const getRemainingBalance = () => {
+  return Math.max(0, (props.invoiceData?.total || 0) - getTotalPaid())
+}
 </script>
 
 <style scoped>

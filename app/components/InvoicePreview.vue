@@ -56,7 +56,12 @@ const invoiceDataForTemplate = computed(() => ({
   taxRate: store.taxRate,
   taxAmount: store.taxAmount,
   total: store.total,
-  notes: store.notes
+  notes: store.notes,
+  // payment data (agar template bisa hitung status/riwayat)
+  payments: store.payments,
+  totalPaid: store.totalPaid,
+  remainingBalance: store.remainingBalance,
+  paymentStatus: store.paymentStatus
 }))
 </script>
 

@@ -5,7 +5,7 @@ export interface BusinessInfo {
   whatsapp: string;
   bankName: string;
   bankAccount: string;
-  bankAccountName: string; // <-- baru
+  bankAccountName: string;
   address: string;
 }
 
@@ -27,6 +27,16 @@ export interface InvoiceItem {
   total: number;
 }
 
+export interface Payment {
+  id: string;
+  amount: number;
+  type: 'dp' | 'payment'; // dp = down payment, payment = pelunasan
+  paymentDate: string;
+  notes?: string;
+  paymentMethod?: 'cash' | 'bank_transfer' | 'other';
+  createdAt: string;
+}
+
 export interface Invoice {
   id: string
   user_id: string
@@ -43,6 +53,11 @@ export interface Invoice {
   total: number
   selected_template?: 'classic' | 'modern' | 'minimal'
   template_accent_color?: string
+  // Payment fields
+  dp_amount?: number
+  payments?: Payment[] // History pembayaran
+  remaining_balance?: number // Sisa yang harus dibayar
+  payment_status?: 'unpaid' | 'partial' | 'dp_paid' | 'paid'
   created_at: string
   updated_at: string
 }
