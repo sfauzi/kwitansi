@@ -27,16 +27,32 @@
         </div>
       </div>
       
-      <div ref="pdfContentRef" class="bg-white rounded-lg shadow p-6">
-        <component
-          v-if="invoice"
-          :is="currentTemplateComponent"
-          :invoice-data="invoiceDataForPreview"
-          :primary-color="selectedAccentColor"
-        />
-        <div v-else class="text-center py-12">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          <p class="mt-2">Memuat data...</p>
+      <div class="bg-white rounded-lg shadow p-6">
+        <div ref="pdfContentRef" class="bg-white shadow-lg">
+          <component
+            v-if="invoice"
+            :is="currentTemplateComponent"
+            :invoice-data="invoiceDataForPreview"
+            :primary-color="selectedAccentColor"
+          />
+          <div v-else class="text-center py-12">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <p class="mt-2">Memuat data...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- hidden export canvas: struktur disamakan dengan PDFModal agar hasil spacing identik -->
+      <div class="fixed -left-[99999px] top-0 w-[1024px] pointer-events-none" aria-hidden="true">
+        <div class="p-4 bg-gray-50">
+          <div ref="pdfExportRef" class="bg-white shadow-lg">
+            <component
+              v-if="invoice"
+              :is="currentTemplateComponent"
+              :invoice-data="invoiceDataForPreview"
+              :primary-color="selectedAccentColor"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -58,6 +74,7 @@ const router = useRouter()
 const invoiceStore = useInvoiceStore()
 const invoice = ref<any>(null)
 const pdfContentRef = ref<HTMLElement | null>(null)
+const pdfExportRef = ref<HTMLElement | null>(null)
 
 const templateComponents = {
   classic: TemplateClassic,
@@ -77,33 +94,86 @@ const currentTemplateComponent = computed(() => {
   return templateComponents[selectedTemplate.value] || TemplateClassic
 })
 
+const toNumber = (value: unknown, fallback = 0) => {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : fallback
+}
+
 const invoiceDataForPreview = computed(() => {
   if (!invoice.value) return null
+
+  const rawPayments = Array.isArray(invoice.value.payments) ? invoice.value.payments : []
+  const payments = rawPayments.map((p: any, idx: number) => ({
+    id: String(p?.id ?? `${idx}`),
+    amount: toNumber(p?.amount),
+    type: p?.type === 'dp' ? 'dp' : 'payment',
+    paymentDate: p?.paymentDate || p?.payment_date || p?.createdAt || p?.created_at || '',
+    notes: p?.notes || ''
+  }))
+
+  const subtotal = toNumber(invoice.value.subtotal)
+  const discountAmount = toNumber(invoice.value.discount_amount)
+  const discountValue = toNumber(invoice.value.discount_value)
+  const taxRate = toNumber(invoice.value.tax_rate)
+  const taxAmount = toNumber(invoice.value.tax_amount)
+  const total = toNumber(invoice.value.total)
+
+  const totalPaid = payments.reduce((sum: number, p: any) => sum + toNumber(p.amount), 0)
+  const remainingBalance =
+    typeof invoice.value.remaining_balance === 'number'
+      ? Math.max(0, toNumber(invoice.value.remaining_balance))
+      : Math.max(0, total - totalPaid)
+
+  const paymentStatus =
+    invoice.value.payment_status ||
+    (totalPaid <= 0 ? 'unpaid' : totalPaid >= total ? 'paid' : 'partial')
+
   return {
     businessInfo: invoice.value.business_info,
     clientInfo: invoice.value.client_info,
-    items: invoice.value.items,
-    subtotal: invoice.value.subtotal,
-    discountAmount: invoice.value.discount_amount,
-    discountValue: invoice.value.discount_value,
+    items: (invoice.value.items || []).map((item: any) => ({
+      ...item,
+      quantity: toNumber(item?.quantity),
+      unitPrice: toNumber(item?.unitPrice),
+      total: toNumber(item?.total)
+    })),
+    subtotal,
+    discountAmount,
+    discountValue,
     discountType: invoice.value.discount_type,
-    taxRate: invoice.value.tax_rate,
-    taxAmount: invoice.value.tax_amount,
-    total: invoice.value.total,
-    notes: invoice.value.notes
+    taxRate,
+    taxAmount,
+    total,
+    notes: invoice.value.notes,
+
+    // penting agar semua template menampilkan histori + status yang sama
+    payments,
+    totalPaid,
+    remainingBalance,
+    paymentStatus
   }
 })
 
 const downloadPDF = async () => {
-  const element = pdfContentRef.value
+  const element = pdfExportRef.value || pdfContentRef.value
   if (element) {
     const html2pdf = (await import('html2pdf.js')).default
+    const filename =
+      invoiceDataForPreview.value?.clientInfo?.invoiceNumber ||
+      invoice.value?.client_info?.invoiceNumber ||
+      'invoice'
+
     const opt = {
-      margin: [0.5, 0.5, 0.5, 0.5],
-      filename: `${invoice.value.client_info.invoiceNumber}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+      margin: [0.5, 0.5, 0.5, 0.5] as [number, number, number, number],
+      filename: `${filename}.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        letterRendering: true
+      },
+      jsPDF: { unit: 'in' as const, format: 'a4' as const, orientation: 'portrait' as const }
     }
     await html2pdf().set(opt).from(element).save()
   }

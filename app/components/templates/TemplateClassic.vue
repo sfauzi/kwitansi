@@ -1,7 +1,8 @@
 <!-- components/templates/TemplateClassic.vue -->
 <template>
   <div class="template-classic" :style="styleVariables">
-    <!-- Header dengan border double -->
+
+    <!-- Header -->
     <div class="border-b-4 border-double border-gray-800 pb-4 mb-6">
       <div class="flex justify-between items-start">
         <div>
@@ -19,7 +20,7 @@
       </div>
     </div>
 
-    <!-- Client Info dengan border -->
+    <!-- Client Info -->
     <div class="grid grid-cols-2 gap-6 mb-8">
       <div class="border border-gray-300 p-4">
         <h3 class="font-bold text-gray-700 uppercase text-sm mb-2">Kepada Yth:</h3>
@@ -42,7 +43,7 @@
       </div>
     </div>
 
-    <!-- Items Table dengan style klasik -->
+    <!-- Items Table -->
     <div class="mb-8">
       <table class="w-full border-collapse">
         <thead>
@@ -73,9 +74,7 @@
             <td class="border border-gray-300 p-3 text-right text-red-600">- {{ formatRupiah(invoiceData.discountAmount) }}</td>
           </tr>
           <tr v-if="invoiceData.taxRate > 0">
-            <td colspan="3" class="border border-gray-300 p-3 text-right font-semibold">
-              Pajak ({{ invoiceData.taxRate }}%)
-            </td>
+            <td colspan="3" class="border border-gray-300 p-3 text-right font-semibold">Pajak ({{ invoiceData.taxRate }}%)</td>
             <td class="border border-gray-300 p-3 text-right">{{ formatRupiah(invoiceData.taxAmount) }}</td>
           </tr>
           <tr class="bg-gray-800 text-white">
@@ -86,8 +85,57 @@
       </table>
     </div>
 
+    <!-- ── Payment Status ── -->
+    <div v-if="invoiceData.payments && invoiceData.payments.length > 0"
+         class="border-t-2 border-gray-300 pt-5 mb-6">
+      <h3 class="font-bold text-gray-700 mb-3">Data Pembayaran</h3>
+
+      <!-- Tabel riwayat -->
+      <table class="w-full border-collapse mb-4">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="border border-gray-300 p-2 text-left text-sm font-semibold text-gray-700 w-10">No</th>
+            <th class="border border-gray-300 p-2 text-left text-sm font-semibold text-gray-700">Tanggal</th>
+            <th class="border border-gray-300 p-2 text-left text-sm font-semibold text-gray-700">Keterangan</th>
+            <th class="border border-gray-300 p-2 text-right text-sm font-semibold text-gray-700">Jumlah</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(payment, index) in invoiceData.payments" :key="payment.id">
+            <td class="border border-gray-200 p-2 text-sm text-gray-600">{{ Number(index) + 1 }}</td>
+            <td class="border border-gray-200 p-2 text-sm text-gray-600">{{ formatDateTime(payment.paymentDate) }}</td>
+            <td class="border border-gray-200 p-2 text-sm text-gray-600">
+              {{ payment.type === 'dp' ? 'Down Payment' : 'Pelunasan' }}
+              <span v-if="payment.notes" class="text-gray-400"> · {{ payment.notes }}</span>
+            </td>
+            <td class="border border-gray-200 p-2 text-sm text-right text-gray-800">{{ formatRupiah(payment.amount) }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Summary kanan bawah -->
+      <div class="flex justify-end">
+        <div class="w-72">
+          <div class="flex justify-between text-sm py-1 border-b border-gray-200">
+            <span class="text-gray-600">Jumlah Bayar</span>
+            <span class="font-bold text-gray-800">{{ formatRupiah(getTotalPaid()) }}</span>
+          </div>
+          <div class="flex justify-between text-sm py-1 border-b border-gray-200">
+            <span class="text-gray-600">Discount</span>
+            <span class="font-bold text-gray-800">{{ formatRupiah(invoiceData.discountAmount || 0) }}</span>
+          </div>
+          <div class="flex justify-between text-sm py-2">
+            <span class="text-gray-600">Kurang</span>
+            <span class="font-bold" :class="getRemainingBalance() > 0 ? 'text-red-600' : 'text-green-600'">
+              {{ getRemainingBalance() > 0 ? formatRupiah(getRemainingBalance()) : formatRupiah(0) }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Bank Info -->
-    <div v-if="invoiceData.businessInfo.bankName && invoiceData.businessInfo.bankAccount" 
+    <div v-if="invoiceData.businessInfo.bankName && invoiceData.businessInfo.bankAccount"
          class="border-t-2 border-gray-300 pt-4 mb-4">
       <h3 class="font-bold text-gray-700 mb-2">Informasi Pembayaran:</h3>
       <div class="grid grid-cols-2 gap-2 text-sm">
@@ -144,12 +192,31 @@ const formatDate = (dateString: string) => {
   })
 }
 
+const formatDateTime = (dateString: string) => {
+  if (!dateString) return '-'
+  return new Date(dateString).toLocaleString('id-ID', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 const discountDisplay = computed(() => {
   if (props.invoiceData.discountType === 'percentage') {
     return `${props.invoiceData.discountValue}%`
   }
   return formatRupiah(props.invoiceData.discountValue)
 })
+
+const getTotalPaid = () => {
+  return (props.invoiceData?.payments || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+}
+
+const getRemainingBalance = () => {
+  return Math.max(0, (props.invoiceData?.total || 0) - getTotalPaid())
+}
 </script>
 
 <style scoped>

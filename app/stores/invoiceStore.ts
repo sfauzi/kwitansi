@@ -1,6 +1,6 @@
 // stores/invoiceStore.ts
 import { defineStore } from 'pinia'
-import type { Invoice, InvoiceItem, BusinessInfo, ClientInfo } from '~/types/invoice'
+import type { Invoice, InvoiceItem, BusinessInfo, ClientInfo, Payment } from '~/types/invoice'
 import type { TemplateType } from '~/types/template'
 
 const calculateSubtotal = (items: InvoiceItem[]) => {
@@ -57,7 +57,12 @@ export const useInvoiceStore = defineStore('invoice', {
     discountValue: 0,
     taxRate: 0,
     notes: '',
-    saving: false
+    saving: false,
+    // Payment state
+    dpAmount: 0,
+    payments: [] as Payment[],
+    paymentNotes: '',
+    paymentMethod: 'bank_transfer' as 'cash' | 'bank_transfer' | 'other'
   }),
 
   getters: {
@@ -94,13 +99,55 @@ export const useInvoiceStore = defineStore('invoice', {
       return taxableAmount + taxAmount
     },
 
-    // 🔥 Perbaikan: Format data untuk dikirim ke Supabase (snake_case)
+    // Payment related getters
+    totalPaid: (state) => {
+      return state.payments.reduce((sum, payment) => sum + payment.amount, 0)
+    },
+
+    remainingBalance: (state) => {
+      const total = state.total
+      const totalPaid = state.payments.reduce((sum, payment) => sum + payment.amount, 0)
+      return Math.max(0, total - totalPaid)
+    },
+
+    paymentStatus: (state) => {
+      const total = state.total
+      const totalPaid = state.payments.reduce((sum, payment) => sum + payment.amount, 0)
+
+      if (totalPaid <= 0) return 'unpaid'
+      if (totalPaid >= total) return 'paid'
+
+      const hasDP = state.payments.some(p => p.type === 'dp')
+      const hasPelunasan = state.payments.some(p => p.type === 'payment')
+
+      if (hasDP && !hasPelunasan) return 'dp_paid'
+      return 'partial'
+    },
+
+    // 🔥 Format data untuk dikirim ke Supabase (snake_case)
     formattedForDatabase: (state) => {
       const subtotal = calculateSubtotal(state.items)
       const discountAmount = calculateDiscountAmount(subtotal, state.discountType, state.discountValue)
       const taxableAmount = subtotal - discountAmount
       const taxAmount = (taxableAmount * state.taxRate) / 100
       const total = taxableAmount + taxAmount
+
+      const totalPaid = state.payments.reduce((sum, payment) => sum + payment.amount, 0)
+      const dpPaid = state.payments
+        .filter(payment => payment.type === 'dp')
+        .reduce((sum, payment) => sum + payment.amount, 0)
+      const remainingBalance = Math.max(0, total - totalPaid)
+
+      const hasDP = state.payments.some(p => p.type === 'dp')
+      const hasPelunasan = state.payments.some(p => p.type === 'payment')
+      const paymentStatus =
+        totalPaid <= 0
+          ? 'unpaid'
+          : totalPaid >= total
+            ? 'paid'
+            : hasDP && !hasPelunasan
+              ? 'dp_paid'
+              : 'partial'
 
       return {
         business_info: state.businessInfo,
@@ -115,7 +162,12 @@ export const useInvoiceStore = defineStore('invoice', {
         tax_amount: taxAmount,
         total,
         selected_template: state.selectedTemplate,
-        template_accent_color: state.templateAccentColor
+        template_accent_color: state.templateAccentColor,
+        // Payment fields
+        dp_amount: dpPaid,
+        payments: state.payments,
+        remaining_balance: remainingBalance,
+        payment_status: paymentStatus
       }
     },
 
@@ -154,7 +206,7 @@ export const useInvoiceStore = defineStore('invoice', {
     updateItem(id: string, field: keyof InvoiceItem, value: any) {
       const item = this.items.find(i => i.id === id)
       if (item) {
-        ;(item as Record<keyof InvoiceItem, any>)[field] = value
+        (item as Record<keyof InvoiceItem, any>)[field] = value
         if (field === 'quantity' || field === 'unitPrice') {
           item.total = item.quantity * item.unitPrice
         }
@@ -163,7 +215,6 @@ export const useInvoiceStore = defineStore('invoice', {
 
     setTemplate(template: TemplateType) {
       this.selectedTemplate = template
-      // Save to localStorage
       if (process.client) {
         localStorage.setItem('invoice_template', template)
       }
@@ -184,6 +235,93 @@ export const useInvoiceStore = defineStore('invoice', {
         if (savedTemplate) this.selectedTemplate = savedTemplate
         if (savedColor) this.templateAccentColor = savedColor
       }
+    },
+
+    // Payment Actions
+    addDP() {
+      if (this.dpAmount <= 0) {
+        alert('Masukkan jumlah DP yang valid')
+        return false
+      }
+
+      if (this.payments.some(p => p.type === 'dp')) {
+        alert('DP sudah ditambahkan')
+        return false
+      }
+
+      if (this.dpAmount > this.remainingBalance) {
+        alert('Jumlah DP tidak boleh melebihi sisa tagihan')
+        return false
+      }
+
+      const newPayment: Payment = {
+        id: Date.now().toString(),
+        amount: this.dpAmount,
+        type: 'dp',
+        paymentDate: new Date().toISOString(),
+        notes: this.paymentNotes || 'Pembayaran Down Payment',
+        paymentMethod: this.paymentMethod,
+        createdAt: new Date().toISOString()
+      }
+
+      this.payments.push(newPayment)
+      this.dpAmount = 0
+      this.paymentNotes = ''
+
+      return true
+    },
+
+    addPayment() {
+      const paymentAmount = this.remainingBalance
+      
+      if (paymentAmount <= 0) {
+        alert('Invoice sudah lunas')
+        return false
+      }
+
+      const newPayment: Payment = {
+        id: Date.now().toString(),
+        amount: paymentAmount,
+        type: 'payment',
+        paymentDate: new Date().toISOString(),
+        notes: this.paymentNotes || 'Pembayaran pelunasan',
+        paymentMethod: this.paymentMethod,
+        createdAt: new Date().toISOString()
+      }
+
+      this.payments.push(newPayment)
+      this.paymentNotes = ''
+      
+      return true
+    },
+
+    addCustomPayment(amount: number, notes: string) {
+      if (amount <= 0) {
+        alert('Masukkan jumlah pembayaran yang valid')
+        return false
+      }
+      
+      if (amount > this.remainingBalance) {
+        alert(`Jumlah pembayaran melebihi sisa tagihan (${this.formatRupiah(this.remainingBalance)})`)
+        return false
+      }
+
+      const newPayment: Payment = {
+        id: Date.now().toString(),
+        amount: amount,
+        type: 'payment',
+        paymentDate: new Date().toISOString(),
+        notes: notes || 'Pembayaran',
+        paymentMethod: this.paymentMethod,
+        createdAt: new Date().toISOString()
+      }
+
+      this.payments.push(newPayment)
+      return true
+    },
+
+    removePayment(paymentId: string) {
+      this.payments = this.payments.filter(p => p.id !== paymentId)
     },
 
     async saveInvoice() {
@@ -214,7 +352,8 @@ export const useInvoiceStore = defineStore('invoice', {
         await this.fetchInvoices()
         return { success: true, data }
       } catch (error: any) {
-        return { success: false, error }
+        console.error('Save error:', error)
+        return { success: false, error: error.message }
       } finally {
         this.saving = false
       }
@@ -250,6 +389,10 @@ export const useInvoiceStore = defineStore('invoice', {
       this.discountValue = 0
       this.taxRate = 0
       this.notes = ''
+      // Reset payment
+      this.dpAmount = 0
+      this.payments = []
+      this.paymentNotes = ''
     },
 
     async fetchInvoices() {
@@ -322,7 +465,7 @@ export const useInvoiceStore = defineStore('invoice', {
 
         if (error) throw error
 
-        await this.fetchInvoices() // Refresh list
+        await this.fetchInvoices()
         return { success: true, data }
       } catch (error: any) {
         this.error = error.message
@@ -330,6 +473,18 @@ export const useInvoiceStore = defineStore('invoice', {
       } finally {
         this.loading = false
       }
+    },
+
+    async updatePaymentStatus(id: string) {
+      const totalPaid = this.payments.reduce((sum, p) => sum + p.amount, 0)
+      const remainingBalance = this.total - totalPaid
+      const paymentStatus = totalPaid === 0 ? 'unpaid' : (totalPaid >= this.total ? 'paid' : 'partial')
+
+      return await this.updateInvoice(id, {
+        payments: this.payments,
+        remaining_balance: remainingBalance,
+        payment_status: paymentStatus
+      })
     },
 
     async deleteInvoice(id: string) {
@@ -344,7 +499,7 @@ export const useInvoiceStore = defineStore('invoice', {
 
         if (error) throw error
 
-        await this.fetchInvoices() // Refresh list
+        await this.fetchInvoices()
         return { success: true }
       } catch (error: any) {
         this.error = error.message
@@ -362,10 +517,20 @@ export const useInvoiceStore = defineStore('invoice', {
       this.discountValue = invoice.discount_value
       this.taxRate = invoice.tax_rate
       this.notes = invoice.notes
-
-      this.selectedTemplate = ((invoice as any).selected_template || 'classic')
-      this.templateAccentColor = ((invoice as any).template_accent_color || '#3b82f6')
+      this.selectedTemplate = (invoice as any).selected_template || 'classic'
+      this.templateAccentColor = (invoice as any).template_accent_color || '#3b82f6'
+      
+      // Load payment data
+      this.dpAmount = 0
+      this.payments = invoice.payments || []
     },
-    
+
+    formatRupiah(value: number) {
+      return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0
+      }).format(value)
+    }
   }
 })
